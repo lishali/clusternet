@@ -174,7 +174,7 @@ def test_svm_cluster(communities = 2, group_size = 10, seed=1, seed_r=1, p=0.8, 
                 
 
 r_list = [i for i in range(-6, 7, 2)]
-p_q_pairs = [(0.4, 0.05), (0.4,0.2)]
+p_q_pairs = [(0.4, 0.05)]
 l_rate_lst = [10**(-i)/3 for i in range(3, 6, 1)]
 
 
