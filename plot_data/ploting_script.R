@@ -124,12 +124,14 @@ plot_r <- function(csv_file){
 
 
 
-temp_new <- temp[grep("0.0003", temp)]
+temp_new <- temp[grep("*p0.25q0.15*", temp)]
+temp_new <- temp_new[grep("*rate3.33333333333e-05*", temp_new)]
 
-a <- read.csv(temp_new[2])
+a <- read.csv(temp_new[1])
 a
 
-plot_loss(temp_new[2])
+plot_loss(temp_new[4])
+
 plot_gradient(temp_new[2])
 plot_r(temp_new[2])
 
