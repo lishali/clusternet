@@ -196,7 +196,7 @@ def learn_average_deg_variable(communities = 2, group_size = 10, seed_v=None, pr
         "r_param_grad": r_param_grad_lst, "avg_deg": avg_deg_lst, "data":data_lst }
     d = pd.DataFrame(d)
     easy_size = len(data)
-        d.to_csv("/Users/xiangli/Desktop/clusternet/Learning_r_matrix_data/mean{}l_rate{}data_size{}p_min{}p_max{}hard_ratio{}.csv".format(mean, l_rate, easy_size+hard_size, p_min, p_max, hard_ratio))
+    d.to_csv("/accounts/grad/janetlishali/clusternet/r_array_op/mean{}l_rate{}data_size{}p_min{}p_max{}hard_ratio{}.csv".format(mean, l_rate, easy_size+hard_size, p_min, p_max, hard_ratio))
     return  d
                 
                 
@@ -216,8 +216,8 @@ np.random.shuffle(data)
                 
                 
                 
-mean_list = [i for i in np.linspace(-4.0, 4.0, 4)]
-l_rate_lst = [0.001,0.0001,0.00001, 0.000001]
+mean_list = [-4]
+l_rate_lst = [0.001]#,0.0001,0.00001, 0.000001]
 
 
 

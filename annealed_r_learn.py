@@ -12,8 +12,8 @@ import pandas as pd
 communities = 2
 group_size = 10
 
-
-
+mean_list = [-2]
+l_rate_lst = [0.001]#,0.0001,0.00001, 0.000001]
 
 @ops.RegisterGradient("grassman_with_2d")
 def _test1(op, grad_e, grad_v):
@@ -36,6 +36,8 @@ def balanced_stochastic_blockmodel(communities=2, groupsize=3, p_in=0.5, p_out=0
     A = nx.adjacency_matrix(G).todense()
     
     return A
+
+
 def target_subspace(adj, groupsize, communities, diag, dim_proj):
     normalizer = tf.cast(2.0*groupsize*communities, dtype=tf.float64)
     total_degree = tf.cast(tf.reduce_sum(adj), dtype=tf.float64)
@@ -124,6 +126,19 @@ def learn_average_deg_variable(communities = 2, group_size = 10, seed_v=None, pr
 
             eigenvec_grad = tf.gradients(eigenvec, v)
             loss_grad = tf.gradients(loss, v)
+
+            #using Laplacian
+            Laplacian = Diag-B
+            eigenval_baseline, eigenvec_baseline = tf.self_adjoint_eig(Laplacian)
+            project_baseline = tf.slice(eigenvec_baseline, [0,0], [communities*group_size, projection_dim])
+
+            projected_a_baseline = tf.matmul(tf.matmul(project_baseline, tf.transpose(project_baseline)), true_assignment_a)#tf.transpose(true_assignment_a))
+            projected_b_baseline = tf.matmul(tf.matmul(project_baseline, tf.transpose(project_baseline)), true_assignment_b)
+            loss_baseline = tf.minimum(tf.reduce_sum(tf.square(tf.sub(projected_a_baseline, true_assignment_a))),
+                              tf.reduce_sum(tf.square(tf.sub(projected_b_baseline, true_assignment_b))))
+            
+
+
             
             r_op, target = target_subspace(adj=B, groupsize=group_size, communities=communities, diag=Diag, dim_proj=projection_dim)
             r_diff = (r_op-r_param) #difference between r_op and r_param is how close we are to the average degree
@@ -133,91 +148,124 @@ def learn_average_deg_variable(communities = 2, group_size = 10, seed_v=None, pr
             
             
             sess.run(init)
-            a,r, b, avg_deg= sess.run([v, r_param, r_diff, r_op], feed_dict={X:data[0]})
-            a_lst = []
-            r_lst = []
-            r_diff_list = []
-            b_lst = []
-            c_lst = []
-            d_lst = []
-            avg_deg_lst = []
-            data_lst = []
-            r_param_grad_lst = []
+            V, R_param, R_diff, avg_deg, Loss_baseline= sess.run([v, r_param, r_diff, r_op, loss_baseline], feed_dict={X:data[0]})
+            # V_lst = np.zeros(len(data), np.float64)
+            V_lst = [0.0]*len(data)
+            R_param_lst = np.zeros(len(data), np.float64)
+            R_diff_list = np.zeros(len(data), np.float64)
+            loss_list = [0.0]*len(data)
+            true_assignment_lst = np.zeros(len(data), np.float64)
+            avg_deg_lst = np.zeros(len(data), np.float64)
+#            data_lst = []
+            r_param_grad_lst = [0.0]*len(data)
+            loss_baseline = np.zeros(len(data), np.float64)
+            average_loss = np.zeros(len(data), np.float64)
+                      
+            V_lst[0]=V
+            R_param_lst[0]=R_param
+            R_diff_list[0]=R_diff
+            loss_list[0]=None
+            true_assignment_lst[0]=None
+            avg_deg_lst[0]=avg_deg
+ #           data_lst.append(None)
+            r_param_grad_lst[0]=None
+            loss_baseline[0]=Loss_baseline
+            average_loss[0]=None
             
-            
-            a_lst.append(a)
-            r_lst.append(r)
-            r_diff_list.append(b)
-            b_lst.append(None)
-            c_lst.append(None)
-            d_lst.append(None)
-            avg_deg_lst.append(avg_deg)
-            data_lst.append(None)
-            r_param_grad_lst.append(None)
-            
-            print "initial v: {}. r_param: {}, difference between r_param and sqrt average deg {}.".format(a, r, b)
-            for i in range(len(data)):   
+  #          print "initial v: {}. r_param: {}, difference between r_param and sqrt average deg {}.".format(a, r, b)
+            for i in range(1, len(data)):   
                 try:
                     sess.run(train, feed_dict={X:data[i]})
                     #if i%print_ratio==0:  
                     #print i
                         #try:
-                    a,r, k, b,c,d, r_param_grad, avg_deg = sess.run([v, r_param, r_diff, loss, tf.gradients(loss, v), tf.transpose(projected_a), tf.gradients(loss, r_param), r_op], feed_dict={X:data[i]}) 
-                    a_lst.append(a)
-                    r_lst.append(r)
-                    r_diff_list.append(k)
-                    b_lst.append(b)
-                    c_lst.append(c)
-                    d_lst.append(d)
-                    r_param_grad_lst.append(r_param_grad)
-                    avg_deg_lst.append(avg_deg)
-                    data_lst.append(data[i])
+                    if i%2==0:
+
+                        V, R_param, R_diff, Loss, Loss_baseline, r_param_grad, Tru_assign, avg_deg = sess.run([v, 
+                            r_param, r_diff, loss, loss_baseline, tf.gradients(loss, r_param),
+                            tf.transpose(projected_a), r_op], feed_dict={X:data[i]}) 
+
+                        #for j in range(len(data)):
+                         #   loss_tmp = np.zeros(len(data), np.float64)
+                          #  tmp = sess.run(loss, feed_dict={X:data[j]})
+                           # loss_tmp[j](tmp)
+
+                        #np.mean(loss_tmp)
+
+                        #average_loss = np.mean()
+
+                        V_lst[j]=V
+                        R_param_lst[j]=R_param
+                        R_diff_list[j]=R_diff
+                        loss_list[j]=Loss
+                        loss_baseline[j]=Loss_baseline
+                        true_assignment_lst[j]=Tru_assign
+                        r_param_grad_lst[j]=r_param_grad
+                        avg_deg_lst[j]=avg_deg
+                    #data_lst.append(data[i])
                     
-                    print "step: {}: loss: {}, avg_deg: {} r_param:{}, r_diff: {}, r_param gradient: {}".format(i, b, avg_deg, r, k, r_param_grad)
+                        print "step {}: Loss:{}, Loss_baseline: {}, avg_deg: {}".format(j, Loss, Loss_baseline, avg_deg)
                     
                             
                 except: 
-                    a,r, k, b,c,d, r_param_grad, avg_deg = None, None, None, None, None, None, None, None, None
-                    a_lst.append(a)
-                    r_lst.append(r)
-                    r_diff_list.append(k)
-                    b_lst.append(b)
-                    c_lst.append(c)
-                    d_lst.append(d)
-                    r_param_grad_lst.append(r_param_grad)
-                    avg_deg_lst.append(avg_deg)
-                    data_lst.append(data[i])
-                    print "step:{} not sucessful".format(i)
-                    pass
+                        V, R_param, R_diff, Loss, Loss_baseline, r_param_grad, Tru_assign, avg_deg = None, None, None, None, None, None, None, None
+                        V_lst[i]=V
+                        R_param_lst[i]=R_param
+                        R_diff_list[i]=R_diff
+                        loss_list[i]=Loss
+                        loss_baseline[i]=Loss_baseline
+                        true_assignment_lst[i]=Tru_assign
+                        r_param_grad_lst[i]=r_param_grad
+                        avg_deg_lst[i]=avg_deg
+                    #data_lst.append(data[i])
+                        print "step:{} not sucessful".format(i)
+                        pass
                 
 
 
-    d = {"v": a_lst, "r_param": r_lst, "r_diff": r_diff_list, "loss": b_lst, "gradient_loss_v": c_lst, "projection": d_lst, 
-        "r_param_grad": r_param_grad_lst, "avg_deg": avg_deg_lst, "data":data_lst }
+    d = {"v": V_lst, "r_param": R_param_lst, "r_diff": R_diff_list, "loss": loss_list, "loss_baseline": loss_baseline, "R_grad_list": r_param_grad_lst, 
+        "true_assignmnet": true_assignment_lst, "avg_deg": avg_deg_lst}#,"data":data_lst }
     d = pd.DataFrame(d)
     easy_size = len(data)
-        d.to_csv("/Users/xiangli/Desktop/clusternet/Learning_r_matrix_data/mean{}l_rate{}data_size{}p_min{}p_max{}hard_ratio{}.csv".format(mean, l_rate, easy_size+hard_size, p_min, p_max, hard_ratio))
+    #d.to_csv("mean{}l_rate{}data_size{}p_min{}p_max{}hard_ratio{}.csv".format(mean, l_rate, easy_size+hard_size, p_min, p_max, hard_ratio))
     return  d
                 
+            #/accounts/grad/janetlishali/clusternet/r_array_op    
                 
-                
-easy_size=5000
+easy_size=20
 hard_size=1
 p_min = 0.4
 p_max = 0.41
+
 hard_ratio = 0.1
 
 
 data_easy = [np.asarray(balanced_stochastic_blockmodel(communities, group_size, p, 0.1*p)).astype(np.double) for p in np.linspace(p_min, p_max,easy_size)]
-data_hard = [np.asarray(balanced_stochastic_blockmodel(communities, group_size, p, hard_ratio*p)).astype(np.double) for q in np.linspace(p_min, p_max,hard_size)]
+data_hard = [np.asarray(balanced_stochastic_blockmodel(communities, group_size, p, hard_ratio*p)).astype(np.double) for p in np.linspace(p_min, p_max,hard_size)]
+
+data1 = [np.asarray(balanced_stochastic_blockmodel(communities, group_size, p, 0.1*p)).astype(np.double) for p in np.linspace(p_min-0.1, p_max-0.1, np.int_(np.ceil(easy_size/2)))]
+data_h1 = [np.asarray(balanced_stochastic_blockmodel(communities, group_size, p, hard_ratio*p)).astype(np.double) for p in np.linspace(p_min-0.1, p_max-0.1,hard_size)]
+
+data2 = [np.asarray(balanced_stochastic_blockmodel(communities, group_size, p, 0.1*p)).astype(np.double) for p in np.linspace(p_min-0.15, p_max-0.15,np.int_(np.ceil(easy_size/3)))]
+data_h2 = [np.asarray(balanced_stochastic_blockmodel(communities, group_size, p, hard_ratio*p)).astype(np.double) for p in np.linspace(p_min-0.15, p_max-0.15,hard_size)]
+
+
+
+
 
 data = data_easy+data_hard
 np.random.shuffle(data)
+a = data1+data_h1+data[1:np.int_(np.ceil(easy_size/2)):1]
+
+np.random.shuffle(a)
+
+b = data1[1:np.int_(np.ceil(easy_size/3)):1]+data2+data_h2+data[1:np.int_(np.ceil(easy_size/3)):1]
+np.random.shuffle(b)
+data = data+a+b                
                 
                 
-                
-mean_list = [i for i in np.linspace(-4.0, 4.0, 4)]
-l_rate_lst = [0.001,0.0001,0.00001, 0.000001]
+
+
 
 
 

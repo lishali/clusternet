@@ -11,7 +11,8 @@ import pandas as pd
 
 communities = 2
 group_size = 10
-
+easy_size=10
+hard_size=1
 
 
 
@@ -60,7 +61,11 @@ def rnd_vec_normed(communities, groupsize, seed=None):
 
 
 
+data_easy = [np.asarray(balanced_stochastic_blockmodel(communities, group_size, p, 0.1*p)).astype(np.double) for p in np.linspace(0.1, 0.4,easy_size)]
+data_hard = [np.asarray(balanced_stochastic_blockmodel(communities, group_size, p, 0.5*p)).astype(np.double) for q in np.linspace(0.1, 0.4,hard_size)]
 
+data = data_easy+data_hard
+np.random.shuffle(data)
 
 def learn_average_deg_variable(communities = 2, group_size = 10, seed_v=None, projection_dim=2, l_rate=0.00000001, mean=0.3, sd=0.1):
     """testing to see if the loss will decrease backproping through very simple function"""
@@ -118,7 +123,7 @@ def learn_average_deg_variable(communities = 2, group_size = 10, seed_v=None, pr
             loss = tf.minimum(tf.reduce_sum(tf.square(tf.sub(projected_a, true_assignment_a))),
                               tf.reduce_sum(tf.square(tf.sub(projected_b, true_assignment_b))))
             
-            optimizer = tf.train.AdamOptimizer(l_rate)
+            optimizer = tf.train.GradientDescentOptimizer(l_rate)
             
             train = optimizer.minimize(loss, var_list=[v])
 
@@ -133,17 +138,13 @@ def learn_average_deg_variable(communities = 2, group_size = 10, seed_v=None, pr
             
             
             sess.run(init)
-            a,r, b, avg_deg= sess.run([v, r_param, r_diff, r_op], feed_dict={X:data[0]})
+            a,r, b= sess.run([v, r_param, r_diff], feed_dict={X:data[0]})
             a_lst = []
             r_lst = []
             r_diff_list = []
             b_lst = []
             c_lst = []
             d_lst = []
-            avg_deg_lst = []
-            data_lst = []
-            r_param_grad_lst = []
-            
             
             a_lst.append(a)
             r_lst.append(r)
@@ -151,9 +152,6 @@ def learn_average_deg_variable(communities = 2, group_size = 10, seed_v=None, pr
             b_lst.append(None)
             c_lst.append(None)
             d_lst.append(None)
-            avg_deg_lst.append(avg_deg)
-            data_lst.append(None)
-            r_param_grad_lst.append(None)
             
             print "initial v: {}. r_param: {}, difference between r_param and sqrt average deg {}.".format(a, r, b)
             for i in range(len(data)):   
@@ -162,62 +160,42 @@ def learn_average_deg_variable(communities = 2, group_size = 10, seed_v=None, pr
                     #if i%print_ratio==0:  
                     #print i
                         #try:
-                    a,r, k, b,c,d, r_param_grad, avg_deg = sess.run([v, r_param, r_diff, loss, tf.gradients(loss, v), tf.transpose(projected_a), tf.gradients(loss, r_param), r_op], feed_dict={X:data[i]}) 
+                    a,r, k, b,c,d = sess.run([v, r_param, r_diff, loss, tf.gradients(loss, v), tf.transpose(projected_a)], feed_dict={X:data[i]}) 
                     a_lst.append(a)
                     r_lst.append(r)
                     r_diff_list.append(k)
                     b_lst.append(b)
                     c_lst.append(c)
                     d_lst.append(d)
-                    r_param_grad_lst.append(r_param_grad)
-                    avg_deg_lst.append(avg_deg)
-                    data_lst.append(data[i])
-                    
-                    print "step: {}: loss: {}, avg_deg: {} r_param:{}, r_diff: {}, r_param gradient: {}".format(i, b, avg_deg, r, k, r_param_grad)
                     
                             
                 except: 
-                    a,r, k, b,c,d, r_param_grad, avg_deg = None, None, None, None, None, None, None, None, None
+                    a,r, k, b,c,d = None, None, None, None, None, None 
                     a_lst.append(a)
                     r_lst.append(r)
                     r_diff_list.append(k)
                     b_lst.append(b)
                     c_lst.append(c)
                     d_lst.append(d)
-                    r_param_grad_lst.append(r_param_grad)
-                    avg_deg_lst.append(avg_deg)
-                    data_lst.append(data[i])
-                    print "step:{} not sucessful".format(i)
                     pass
                 
 
+                    #print "current r: {}, current loss: {}, gradient of loss/r is {} and current assignments (up to sign) {}.".format(a,b,c,d)  
 
-    d = {"v": a_lst, "r_param": r_lst, "r_diff": r_diff_list, "loss": b_lst, "gradient_loss_v": c_lst, "projection": d_lst, 
-        "r_param_grad": r_param_grad_lst, "avg_deg": avg_deg_lst, "data":data_lst }
-    d = pd.DataFrame(d)
-    easy_size = len(data)
-        d.to_csv("/Users/xiangli/Desktop/clusternet/Learning_r_matrix_data/mean{}l_rate{}data_size{}p_min{}p_max{}hard_ratio{}.csv".format(mean, l_rate, easy_size+hard_size, p_min, p_max, hard_ratio))
+    #d = {"v": a_lst, "r_param": r_lst, "r_diff": r_diff_list, "loss": b_lst, "gradient_loss_v": c_lst, "projection": d_lst}
+    #d = pd.DataFrame(d)
+    #easy_size = len(data)
+    #d.to_csv("/Users/xiangli/Desktop/clusternet/Learning_r_matrix_data/mean{}l_rate{}step{}data_size{}.csv".format(mean, l_rate, print_ratio, easy_size))
     return  d
                 
                 
                 
-easy_size=5000
-hard_size=1
-p_min = 0.4
-p_max = 0.41
-hard_ratio = 0.1
 
-
-data_easy = [np.asarray(balanced_stochastic_blockmodel(communities, group_size, p, 0.1*p)).astype(np.double) for p in np.linspace(p_min, p_max,easy_size)]
-data_hard = [np.asarray(balanced_stochastic_blockmodel(communities, group_size, p, hard_ratio*p)).astype(np.double) for q in np.linspace(p_min, p_max,hard_size)]
-
-data = data_easy+data_hard
-np.random.shuffle(data)
                 
                 
                 
-mean_list = [i for i in np.linspace(-4.0, 4.0, 4)]
-l_rate_lst = [0.001,0.0001,0.00001, 0.000001]
+mean_list = [i for i in np.linspace(-0.5, 0.5, 10)]
+l_rate_lst = [10**(-i)/3 for i in range(4, 6, 1)]
 
 
 
